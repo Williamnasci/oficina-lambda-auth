@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import { getSecretJson } from './secrets';
+import { RDS_CA_BUNDLE } from './rds-ca-bundle';
 
 type DbCredentials = {
     url: string;
@@ -29,18 +30,27 @@ async function getPool(): Promise<Pool> {
 
             // node-postgres trata "sslmode=require" na connection string como
             // alias de "verify-full", o que falha contra o certificado da AWS
-            // RDS (nao e uma CA publica). Mesmo problema e mesma correcao do
-            // PrismaService no oficina-api: remover da URL e configurar SSL
-            // explicitamente.
+            // RDS (nao e uma CA publica conhecida por padrao). Correcao: tirar
+            // da URL e fornecer o bundle oficial de CA da AWS via `ca`,
+            // mantendo rejectUnauthorized: true (valida a identidade do
+            // servidor de verdade, nao so criptografa a conexao).
             const cleanUrl = url.replace(/[?&]sslmode=require\b/, '');
 
             return new Pool({
                 connectionString: cleanUrl,
-                ssl: { rejectUnauthorized: false },
+                ssl: { ca: RDS_CA_BUNDLE, rejectUnauthorized: true },
                 max: 2,
                 connectionTimeoutMillis: 5000,
             });
-        })();
+        })().catch((err) => {
+            // Sem isso, uma falha transitoria (ex: throttle do Secrets Manager,
+            // hiccup de rede) ficaria cacheada como Promise rejeitada para
+            // sempre neste execution environment "quente" do Lambda - toda
+            // invocacao subsequente falharia ate o ambiente ser reciclado.
+            // Limpar o cache permite que a proxima invocacao tente de novo.
+            poolPromise = null;
+            throw err;
+        });
     }
     return poolPromise;
 }
