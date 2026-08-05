@@ -1,0 +1,8 @@
+# Copie para terraform.tfvars e ajuste se necessario. Nao commitar
+# terraform.tfvars (ja esta no .gitignore da raiz do repo).
+
+aws_region               = "us-east-2"
+jwt_expires_in           = "1d"
+auth_login_timeout       = 10
+auth_authorizer_timeout  = 5
+log_retention_days       = 14
