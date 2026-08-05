@@ -96,7 +96,7 @@ jobs:
   terraform-apply:
     name: Terraform apply (main)
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [build-and-test, terraform-plan]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     environment: production
 
