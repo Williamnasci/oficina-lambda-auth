@@ -25,7 +25,9 @@ Decisão e alternativas consideradas (por que Lambda própria em vez de Amazon C
 
 ## Status
 
-✅ Completo e validado ponta a ponta contra a infraestrutura real: as duas funções Lambda aplicadas via Terraform (IAM por função, timeouts explícitos, CA da RDS embutida), CI/CD verde (`build → typecheck → test → terraform plan` na PR, `apply` no merge em `main`), e as rotas registradas no API Gateway (`oficina-infra-k8s`). Testado com um cliente real: login por CPF emite um JWT que o `auth-authorizer` valida corretamente no formato de resposta simples (`enable_simple_responses`).
+✅ Completo e validado ponta a ponta contra a infraestrutura real: as duas funções Lambda aplicadas via Terraform (timeouts explícitos, CA da RDS embutida), CI/CD verde (`build → typecheck → test → terraform plan` na PR, `apply` manual — ver nota abaixo), e as rotas registradas no API Gateway (`oficina-infra-k8s`). Testado com um cliente real: login por CPF emite um JWT que o `auth-authorizer` valida corretamente no formato de resposta simples (`enable_simple_responses`).
+
+> **IAM na conta AWS Academy:** as duas funções passaram a compartilhar a role `LabRole` pré-provisionada pela plataforma, em vez de cada uma ter sua própria role escopada (least privilege por função) como antes — `iam:CreateRole`/`iam:PutRolePolicy` são negados pelo `LabRole` da conta, então não é possível criar/anexar política própria. Trade-off real do sandbox acadêmico, não uma escolha de segurança deste projeto.
 
 ## Deploy e execução
 
@@ -36,7 +38,7 @@ npm run typecheck
 npm run build    # gera dist/auth-login/index.js e dist/auth-authorizer/index.js
 ```
 
-Deploy real via Terraform (`terraform/`) + CI/CD (`.github/workflows/ci-cd.yml`): `terraform plan` em toda PR, `apply` automático ao mergear em `main`.
+Deploy real via Terraform (`terraform/`) + CI/CD (`.github/workflows/ci-cd.yml`): `terraform plan` em toda PR/push. O job `terraform-apply` **não roda mais automático no merge** — só via disparo manual (`gh workflow run ci-cd.yml` ou pela aba Actions), porque a conta AWS Academy Learner Lab usada neste projeto só fornece credenciais de sessão temporárias (`iam:CreateUser` é negado pelo `LabRole`, então não há como manter uma credencial IAM permanente segura como secret). Antes de disparar o apply manualmente, atualize os secrets `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` com uma sessão fresca do lab (AWS Details → Show).
 
 ## Contrato da API
 

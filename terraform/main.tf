@@ -1,4 +1,14 @@
-data "aws_caller_identity" "current" {}
+# AWS Academy Learner Lab nega iam:CreateRole/iam:PutRolePolicy - nao e
+# possivel criar uma role de execucao por funcao (least privilege por
+# Lambda) como este repositorio fazia antes. Reaproveita a LabRole
+# pre-provisionada pela plataforma do Academy (mesmo padrao usado em
+# oficina-infra-k8s/iam.tf para o instance profile da EC2). Trade-off real:
+# as duas funcoes passam a compartilhar uma role ampla em vez de cada uma
+# ter acesso so aos segredos que precisa - aceitavel num sandbox academico
+# descartavel, nao seria numa conta de producao real.
+data "aws_iam_role" "lab_role" {
+  name = "LabRole"
+}
 
 # Referencia o secret do RDS criado em oficina-infra-database, sem duplicar
 # credenciais nem acoplar os dois states diretamente (mesmo padrao usado para
@@ -43,54 +53,6 @@ data "archive_file" "auth_authorizer" {
 
 # --- auth-login: valida CPF, consulta cliente no RDS, emite JWT --------
 
-resource "aws_iam_role" "auth_login" {
-  name = "oficina-auth-login-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "auth_login_logs" {
-  name = "cloudwatch-logs"
-  role = aws_iam_role.auth_login.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
-      Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/oficina-auth-login*"
-    }]
-  })
-}
-
-# IAM por funcao: auth-login precisa dos DOIS segredos (RDS para consultar o
-# cliente, JWT para assinar o token) - auth-authorizer, mais abaixo, so
-# recebe acesso ao segredo do JWT, nao ao do RDS, porque nunca consulta o
-# banco.
-resource "aws_iam_role_policy" "auth_login_secrets" {
-  name = "secrets-access"
-  role = aws_iam_role.auth_login.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = "secretsmanager:GetSecretValue"
-      Resource = [
-        data.aws_secretsmanager_secret.db_credentials.arn,
-        aws_secretsmanager_secret.jwt_secret.arn,
-      ]
-    }]
-  })
-}
-
 resource "aws_cloudwatch_log_group" "auth_login" {
   name              = "/aws/lambda/oficina-auth-login"
   retention_in_days = var.log_retention_days
@@ -98,7 +60,7 @@ resource "aws_cloudwatch_log_group" "auth_login" {
 
 resource "aws_lambda_function" "auth_login" {
   function_name    = "oficina-auth-login"
-  role             = aws_iam_role.auth_login.arn
+  role             = data.aws_iam_role.lab_role.arn
   runtime          = "nodejs20.x"
   handler          = "index.handler"
   filename         = data.archive_file.auth_login.output_path
@@ -124,49 +86,6 @@ resource "aws_lambda_function" "auth_login" {
 
 # --- auth-authorizer: verifica o JWT nas rotas protegidas do API Gateway -
 
-resource "aws_iam_role" "auth_authorizer" {
-  name = "oficina-auth-authorizer-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "auth_authorizer_logs" {
-  name = "cloudwatch-logs"
-  role = aws_iam_role.auth_authorizer.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
-      Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/oficina-auth-authorizer*"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "auth_authorizer_secrets" {
-  name = "secrets-access"
-  role = aws_iam_role.auth_authorizer.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = "secretsmanager:GetSecretValue"
-      # Somente o segredo do JWT - o authorizer nunca consulta o RDS, entao
-      # nao ganha acesso ao segredo do banco (minimo privilegio por funcao).
-      Resource = aws_secretsmanager_secret.jwt_secret.arn
-    }]
-  })
-}
-
 resource "aws_cloudwatch_log_group" "auth_authorizer" {
   name              = "/aws/lambda/oficina-auth-authorizer"
   retention_in_days = var.log_retention_days
@@ -174,7 +93,7 @@ resource "aws_cloudwatch_log_group" "auth_authorizer" {
 
 resource "aws_lambda_function" "auth_authorizer" {
   function_name    = "oficina-auth-authorizer"
-  role             = aws_iam_role.auth_authorizer.arn
+  role             = data.aws_iam_role.lab_role.arn
   runtime          = "nodejs20.x"
   handler          = "index.handler"
   filename         = data.archive_file.auth_authorizer.output_path
