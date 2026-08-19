@@ -25,7 +25,7 @@ Decisão e alternativas consideradas (por que Lambda própria em vez de Amazon C
 
 ## Status
 
-✅ Código das duas funções implementado e testado (`npm test`: 16/16). 🚧 Falta: Terraform (função Lambda, IAM, segredo do JWT), pipeline de CI/CD, e o registro das rotas no API Gateway (`oficina-infra-k8s`) — ver `docs/phase-3-plan.md` no `oficina-api`.
+✅ Completo e validado ponta a ponta contra a infraestrutura real: as duas funções Lambda aplicadas via Terraform (IAM por função, timeouts explícitos, CA da RDS embutida), CI/CD verde (`build → typecheck → test → terraform plan` na PR, `apply` no merge em `main`), e as rotas registradas no API Gateway (`oficina-infra-k8s`). Testado com um cliente real: login por CPF emite um JWT que o `auth-authorizer` valida corretamente no formato de resposta simples (`enable_simple_responses`).
 
 ## Deploy e execução
 
@@ -36,8 +36,22 @@ npm run typecheck
 npm run build    # gera dist/auth-login/index.js e dist/auth-authorizer/index.js
 ```
 
-Deploy real (Terraform + CI/CD) ainda não implementado — próximo passo do roteiro.
+Deploy real via Terraform (`terraform/`) + CI/CD (`.github/workflows/ci-cd.yml`): `terraform plan` em toda PR, `apply` automático ao mergear em `main`.
 
-## Swagger / Postman
+## Contrato da API
 
-_A preencher — a Lambda expõe `POST /auth/login`; contrato será documentado aqui assim que implementado._
+Exposta via API Gateway (`oficina-infra-k8s`), não tem Swagger (não é um framework REST com OpenAPI) — o contrato é este:
+
+**`POST /auth/login`** (público)
+```json
+// Request
+{ "document": "11144477735" }
+
+// Response 200
+{ "access_token": "eyJhbGciOiJIUzI1NiIs..." }
+
+// Response 404 — cliente não encontrado
+{ "message": "Customer not found." }
+```
+
+**Lambda Authorizer** (`auth-authorizer`) — invocada automaticamente pelo API Gateway nas rotas protegidas (`ANY /{proxy+}`), a partir do header `Authorization: Bearer <token>`. Não é chamada diretamente por clientes.
