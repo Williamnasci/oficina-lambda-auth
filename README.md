@@ -55,3 +55,33 @@ Exposta via API Gateway (`oficina-infra-k8s`), não tem Swagger (não é um fram
 ```
 
 **Lambda Authorizer** (`auth-authorizer`) — invocada automaticamente pelo API Gateway nas rotas protegidas (`ANY /{proxy+}`), a partir do header `Authorization: Bearer <token>`. Não é chamada diretamente por clientes.
+
+## Diagrama
+
+Visão focal deste repositório (fluxo de auth — o diagrama completo da solução está no [Diagrama de Componentes](https://github.com/Williamnasci/oficina-api/blob/main/docs/architecture-components.md) do `oficina-api`):
+
+```mermaid
+sequenceDiagram
+    participant C as Cliente
+    participant GW as API Gateway (oficina-infra-k8s)
+    participant Login as auth-login (este repo)
+    participant Auth as auth-authorizer (este repo)
+    participant DB as RDS PostgreSQL
+    participant SM as Secrets Manager
+
+    C->>GW: POST /auth/login {document}
+    GW->>Login: invoke
+    Login->>Login: valida formato do CPF
+    Login->>SM: GetSecretValue (credenciais RDS, JWT secret)
+    Login->>DB: SELECT customer WHERE document = ?
+    DB-->>Login: cliente (ou nulo)
+    Login-->>GW: 200 {access_token} | 404 | 403 inativo
+    GW-->>C: resposta
+
+    C->>GW: ANY /{proxy+} Authorization: Bearer <token>
+    GW->>Auth: invoke (REQUEST authorizer)
+    Auth->>SM: GetSecretValue (JWT secret)
+    Auth->>Auth: verifica assinatura HS256 + expiracao
+    Auth-->>GW: {isAuthorized, context}
+    GW->>GW: encaminha para oficina-api se autorizado
+```
