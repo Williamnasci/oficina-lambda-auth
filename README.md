@@ -25,7 +25,9 @@ Decisão e alternativas consideradas (por que Lambda própria em vez de Amazon C
 
 ## Status
 
-✅ Completo e validado ponta a ponta contra a infraestrutura real: as duas funções Lambda aplicadas via Terraform (IAM por função, timeouts explícitos, CA da RDS embutida), CI/CD verde (`build → typecheck → test → terraform plan` na PR, `apply` manual — ver nota abaixo), e as rotas registradas no API Gateway (`oficina-infra-k8s`). Testado com um cliente real: login por CPF emite um JWT que o `auth-authorizer` valida corretamente no formato de resposta simples (`enable_simple_responses`).
+✅ Completo e validado ponta a ponta contra a infraestrutura real: as duas funções Lambda aplicadas via Terraform (timeouts explícitos, CA da RDS embutida), CI/CD verde (`build → typecheck → test → terraform plan` na PR, `apply` manual — ver nota abaixo), e as rotas registradas no API Gateway (`oficina-infra-k8s`). Testado com um cliente real: login por CPF emite um JWT que o `auth-authorizer` valida corretamente no formato de resposta simples (`enable_simple_responses`).
+
+> **IAM na conta AWS Academy:** as duas funções passaram a compartilhar a role `LabRole` pré-provisionada pela plataforma, em vez de cada uma ter sua própria role escopada (least privilege por função) como antes — `iam:CreateRole`/`iam:PutRolePolicy` são negados pelo `LabRole` da conta, então não é possível criar/anexar política própria. Trade-off real do sandbox acadêmico, não uma escolha de segurança deste projeto.
 
 ## Deploy e execução
 
