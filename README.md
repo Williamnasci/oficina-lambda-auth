@@ -27,8 +27,6 @@ Decisão e alternativas consideradas (por que Lambda própria em vez de Amazon C
 
 ✅ Completo e validado ponta a ponta contra a infraestrutura real: as duas funções Lambda aplicadas via Terraform (timeouts explícitos, CA da RDS embutida), CI/CD verde (`build → typecheck → test → terraform plan` na PR, `apply` manual — ver nota abaixo), e as rotas registradas no API Gateway (`oficina-infra-k8s`). Testado com um cliente real: login por CPF emite um JWT que o `auth-authorizer` valida corretamente no formato de resposta simples (`enable_simple_responses`).
 
-> **IAM na conta AWS Academy:** as duas funções passaram a compartilhar a role `LabRole` pré-provisionada pela plataforma, em vez de cada uma ter sua própria role escopada (least privilege por função) como antes — `iam:CreateRole`/`iam:PutRolePolicy` são negados pelo `LabRole` da conta, então não é possível criar/anexar política própria. Trade-off real do sandbox acadêmico, não uma escolha de segurança deste projeto.
-
 ## Deploy e execução
 
 ```bash
@@ -49,11 +47,20 @@ Exposta via API Gateway (`oficina-infra-k8s`), não tem Swagger (não é um fram
 // Request
 { "document": "11144477735" }
 
-// Response 200
+// Response 200 — sucesso
 { "access_token": "eyJhbGciOiJIUzI1NiIs..." }
+
+// Response 400 — CPF ausente, mal formatado ou JSON inválido no body
+{ "message": "Invalid CPF." }
+
+// Response 403 — cliente encontrado, mas inativo (isActive = false)
+{ "message": "Customer is inactive." }
 
 // Response 404 — cliente não encontrado
 { "message": "Customer not found." }
+
+// Response 502 — falha ao consultar o RDS
+{ "message": "Could not reach the customer database." }
 ```
 
 **Lambda Authorizer** (`auth-authorizer`) — invocada automaticamente pelo API Gateway nas rotas protegidas (`ANY /{proxy+}`), a partir do header `Authorization: Bearer <token>`. Não é chamada diretamente por clientes.
