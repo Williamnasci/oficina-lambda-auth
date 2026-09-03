@@ -11,10 +11,6 @@ function json(statusCode: number, body: unknown): APIGatewayProxyStructuredResul
     };
 }
 
-// POST /auth/login { document: string } -> { access_token: string }
-// Implementa o requisito do PDF: validar CPF, consultar existencia/status do
-// cliente, gerar e devolver um JWT. Ver docs/rfc/0003-estrategia-de-autenticacao.md
-// no oficina-api sobre por que isso e uma Lambda propria e nao Cognito.
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> {
     let document: unknown;
     try {

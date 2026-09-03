@@ -1,5 +1,4 @@
 terraform {
-  # >= 1.10.0 porque backend.tf usa use_lockfile (locking nativo do S3).
   required_version = ">= 1.10.0"
 
   required_providers {

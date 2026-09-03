@@ -2,9 +2,6 @@ import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-sec
 
 const client = new SecretsManagerClient({});
 
-// Cache em memoria durante o tempo de vida do execution environment do
-// Lambda (containers "quentes" reutilizam isso entre invocacoes, evitando
-// uma chamada ao Secrets Manager por requisicao).
 const cache = new Map<string, string>();
 
 export async function getSecretString(secretId: string): Promise<string> {

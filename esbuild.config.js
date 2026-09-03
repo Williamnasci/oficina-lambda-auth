@@ -11,7 +11,7 @@ async function build() {
             platform: 'node',
             target: 'node20',
             outfile: path.join('dist', name, 'index.js'),
-            external: ['@aws-sdk/*'], // ja vem no runtime Lambda Node 20
+            external: ['@aws-sdk/*'], // Provided by the Lambda Node.js 20 runtime.
             sourcemap: false,
             minify: false,
         });
