@@ -1,24 +1,11 @@
-# AWS Academy Learner Lab nega iam:CreateRole/iam:PutRolePolicy - nao e
-# possivel criar uma role de execucao por funcao (least privilege por
-# Lambda) como este repositorio fazia antes. Reaproveita a LabRole
-# pre-provisionada pela plataforma do Academy (mesmo padrao usado em
-# oficina-infra-k8s/iam.tf para o instance profile da EC2). Trade-off real:
-# as duas funcoes passam a compartilhar uma role ampla em vez de cada uma
-# ter acesso so aos segredos que precisa - aceitavel num sandbox academico
-# descartavel, nao seria numa conta de producao real.
 data "aws_iam_role" "lab_role" {
   name = "LabRole"
 }
 
-# Referencia o secret do RDS criado em oficina-infra-database, sem duplicar
-# credenciais nem acoplar os dois states diretamente (mesmo padrao usado para
-# o security group da EC2 em oficina-infra-database/main.tf).
 data "aws_secretsmanager_secret" "db_credentials" {
   name = "oficina/database/credentials"
 }
 
-# Segredo de assinatura/verificacao HS256 dos JWTs. Compartilhado entre
-# auth-login (assina) e auth-authorizer (verifica) via IAM, nao hardcoded.
 resource "random_password" "jwt_secret" {
   length  = 64
   special = true
@@ -34,10 +21,7 @@ resource "aws_secretsmanager_secret_version" "jwt_secret" {
   secret_string = random_password.jwt_secret.result
 }
 
-# --- Empacotamento -----------------------------------------------------
-# Os bundles sao gerados pelo esbuild (npm run build, roda ANTES do
-# terraform apply no CI/CD) em ../dist/<funcao>/index.js. O Terraform so
-# empacota o que ja existe no disco.
+# Packaging
 
 data "archive_file" "auth_login" {
   type        = "zip"
@@ -51,7 +35,7 @@ data "archive_file" "auth_authorizer" {
   output_path = "${path.module}/../dist/auth-authorizer.zip"
 }
 
-# --- auth-login: valida CPF, consulta cliente no RDS, emite JWT --------
+# Auth login
 
 resource "aws_cloudwatch_log_group" "auth_login" {
   name              = "/aws/lambda/oficina-auth-login"
@@ -66,10 +50,6 @@ resource "aws_lambda_function" "auth_login" {
   filename         = data.archive_file.auth_login.output_path
   source_code_hash = data.archive_file.auth_login.output_base64sha256
 
-  # Timeout explicito: o default do Lambda (3s) e curto demais para uma
-  # consulta ao RDS + duas leituras de segredo (Secrets Manager cacheia
-  # entre invocacoes quentes, mas a primeira chamada em um ambiente novo
-  # ainda precisa de folga).
   timeout     = var.auth_login_timeout
   memory_size = 256
 
@@ -84,7 +64,7 @@ resource "aws_lambda_function" "auth_login" {
   depends_on = [aws_cloudwatch_log_group.auth_login]
 }
 
-# --- auth-authorizer: verifica o JWT nas rotas protegidas do API Gateway -
+# Auth authorizer
 
 resource "aws_cloudwatch_log_group" "auth_authorizer" {
   name              = "/aws/lambda/oficina-auth-authorizer"

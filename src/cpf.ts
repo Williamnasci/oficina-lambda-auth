@@ -1,6 +1,3 @@
-// Mesmo algoritmo de src/modules/customers/domain/value-objects/customer-document.value-object.ts
-// no oficina-api. Duplicado (nao importado) porque este e um repositorio
-// separado sem acesso ao codigo-fonte da aplicacao principal.
 
 export function normalizeCpf(raw: string): string {
     return raw.replace(/\D/g, '');

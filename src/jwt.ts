@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { getSecretString } from './secrets';
 
 export type AuthTokenPayload = {
-    sub: string; // customer.id
+    sub: string;
     document: string;
 };
 
