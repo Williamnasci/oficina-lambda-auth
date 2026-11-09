@@ -9,7 +9,7 @@ async function build() {
             entryPoints: [path.join('src', `${name}.ts`)],
             bundle: true,
             platform: 'node',
-            target: 'node20',
+            target: 'node22',
             outfile: path.join('dist', name, 'index.js'),
             external: ['@aws-sdk/*'], // Provided by the Lambda Node.js 20 runtime.
             sourcemap: false,
