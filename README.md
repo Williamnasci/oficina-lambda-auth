@@ -100,3 +100,11 @@ sequenceDiagram
 `auth_customer_source = "os-api"` passa a consultar `POST /internal/auth/customers/lookup` no OS Service. Configure `os_base_url` (HTTPS, alcançável pela Lambda) e `os_auth_lookup_secret_id` (referência a um segredo Secrets Manager com um token de pelo menos 32 caracteres). No OS, o mesmo valor fica em `OS_AUTH_LOOKUP_TOKEN`, separado de `JWT_SECRET`. O LabRole deve poder ler esse segredo. O token do cliente mantém `sub` e `document`, e a falha da API retorna 502 sem fallback ao RDS. O modo `legacy` permanece padrão até o corte.
 
 O Terraform usa Node.js 22, conforme [runtimes Lambda](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html). PRs executam validação Terraform sem backend ou credenciais AWS; plano remoto e apply continuam no workflow manual da main. A troca de modo só deve ocorrer após a importação e conferência dos cadastros reais e a validação do endpoint HTTPS.
+
+### Ordem de ativação do diretório CPF
+
+1. Mantenha auth_customer_source em legacy. Importe os cadastros e compare a quantidade de clientes e amostras de UUIDs, documentos e status com a origem.
+2. Provisione um token dedicado aleatório de pelo menos 32 caracteres no Secrets Manager, com leitura restrita à role da Lambda. Injete o mesmo valor no OS Service e faça o rollout do OS.
+3. A partir da mesma rede da Lambda, valide a rota de consulta via HTTPS. Confira 401 sem token e com token inválido, 200 com um CPF de teste conhecido e 404 para um CPF de teste inexistente. Confirme a identidade devolvida em 200.
+4. Valide a Lambda com os-api em staging ou numa versão isolada antes do corte. Confira o login de um cliente ativo e que falhas do diretório retornam 502. Só então altere a configuração do tráfego principal.
+5. Se houver falha no corte, restaure explicitamente legacy após confirmar que a origem ainda está disponível e coerente. O modo os-api falha sem fallback automático.

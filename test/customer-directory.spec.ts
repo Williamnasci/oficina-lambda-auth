@@ -33,3 +33,13 @@ it('rejects a mismatched CPF and insecure endpoint', async () => {
   process.env.OS_BASE_URL = 'http://os.example.test';
   await expect(lookupCustomer(cpf)).rejects.toThrow('HTTPS');
 });
+
+it('returns 502 when the OS lookup reaches its three-second deadline', async () => {
+  const { handler } = await import('../src/auth-login');
+  jest.mocked(fetch).mockImplementation(async (_url, options) => new Promise((_resolve, reject) => {
+    options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true });
+  }));
+  const result = await handler({ body: JSON.stringify({ document: cpf }) } as Parameters<typeof handler>[0]);
+  expect(result.statusCode).toBe(502);
+  expect(findCustomerByDocument).not.toHaveBeenCalled();
+}, 6000);
