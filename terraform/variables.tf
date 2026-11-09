@@ -27,3 +27,25 @@ variable "log_retention_days" {
   type        = number
   default     = 14
 }
+
+variable "auth_customer_source" {
+  description = "Diretório de clientes do login: legacy ou os-api."
+  type        = string
+  default     = "legacy"
+  validation {
+    condition     = contains(["legacy", "os-api"], var.auth_customer_source)
+    error_message = "Use legacy ou os-api."
+  }
+}
+
+variable "os_base_url" {
+  description = "URL HTTPS do OS Service no modo os-api."
+  type        = string
+  default     = ""
+}
+
+variable "os_auth_lookup_secret_id" {
+  description = "ARN ou nome do segredo existente que guarda apenas o token de consulta do OS."
+  type        = string
+  default     = ""
+}

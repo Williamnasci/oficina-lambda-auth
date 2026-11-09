@@ -3,7 +3,8 @@ data "aws_iam_role" "lab_role" {
 }
 
 data "aws_secretsmanager_secret" "db_credentials" {
-  name = "oficina/database/credentials"
+  count = var.auth_customer_source == "legacy" ? 1 : 0
+  name  = "oficina/database/credentials"
 }
 
 resource "random_password" "jwt_secret" {
@@ -45,7 +46,7 @@ resource "aws_cloudwatch_log_group" "auth_login" {
 resource "aws_lambda_function" "auth_login" {
   function_name    = "oficina-auth-login"
   role             = data.aws_iam_role.lab_role.arn
-  runtime          = "nodejs20.x"
+  runtime          = "nodejs22.x"
   handler          = "index.handler"
   filename         = data.archive_file.auth_login.output_path
   source_code_hash = data.archive_file.auth_login.output_base64sha256
@@ -54,10 +55,22 @@ resource "aws_lambda_function" "auth_login" {
   memory_size = 256
 
   environment {
-    variables = {
-      DB_SECRET_ID   = data.aws_secretsmanager_secret.db_credentials.arn
-      JWT_SECRET_ID  = aws_secretsmanager_secret.jwt_secret.arn
-      JWT_EXPIRES_IN = var.jwt_expires_in
+    variables = merge({
+      AUTH_CUSTOMER_SOURCE = var.auth_customer_source
+      JWT_SECRET_ID        = aws_secretsmanager_secret.jwt_secret.arn
+      JWT_EXPIRES_IN       = var.jwt_expires_in
+      }, var.auth_customer_source == "os-api" ? {
+      OS_BASE_URL              = var.os_base_url
+      OS_AUTH_LOOKUP_SECRET_ID = var.os_auth_lookup_secret_id
+      } : {
+      DB_SECRET_ID = data.aws_secretsmanager_secret.db_credentials[0].arn
+    })
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.auth_customer_source != "os-api" || (startswith(var.os_base_url, "https://") && var.os_auth_lookup_secret_id != "")
+      error_message = "O modo os-api exige os_base_url HTTPS e os_auth_lookup_secret_id."
     }
   }
 
@@ -74,7 +87,7 @@ resource "aws_cloudwatch_log_group" "auth_authorizer" {
 resource "aws_lambda_function" "auth_authorizer" {
   function_name    = "oficina-auth-authorizer"
   role             = data.aws_iam_role.lab_role.arn
-  runtime          = "nodejs20.x"
+  runtime          = "nodejs22.x"
   handler          = "index.handler"
   filename         = data.archive_file.auth_authorizer.output_path
   source_code_hash = data.archive_file.auth_authorizer.output_base64sha256

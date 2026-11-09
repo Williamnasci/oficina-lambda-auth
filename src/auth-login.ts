@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { isValidCpf, normalizeCpf } from './cpf';
-import { findCustomerByDocument } from './db';
+import { lookupCustomer } from './customer-directory';
 import { signAuthToken } from './jwt';
 
 function json(statusCode: number, body: unknown): APIGatewayProxyStructuredResultV2 {
@@ -28,10 +28,10 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
 
     let customer;
     try {
-        customer = await findCustomerByDocument(normalized);
-    } catch (err) {
-        console.error('DB error while looking up customer', err);
-        return json(502, { message: 'Could not reach the customer database.' });
+        customer = await lookupCustomer(normalized);
+    } catch {
+        console.error('Customer directory lookup failed');
+        return json(502, { message: 'Could not reach the customer directory.' });
     }
 
     if (!customer) {

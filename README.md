@@ -94,3 +94,9 @@ sequenceDiagram
     Auth-->>GW: {isAuthorized, context}
     GW->>GW: encaminha para oficina-api se autorizado
 ```
+
+## Diretório CPF da Fase 4
+
+`auth_customer_source = "os-api"` passa a consultar `POST /internal/auth/customers/lookup` no OS Service. Configure `os_base_url` (HTTPS, alcançável pela Lambda) e `os_auth_lookup_secret_id` (referência a um segredo Secrets Manager com um token de pelo menos 32 caracteres). No OS, o mesmo valor fica em `OS_AUTH_LOOKUP_TOKEN`, separado de `JWT_SECRET`. O LabRole deve poder ler esse segredo. O token do cliente mantém `sub` e `document`, e a falha da API retorna 502 sem fallback ao RDS. O modo `legacy` permanece padrão até o corte.
+
+O Terraform usa Node.js 22, conforme [runtimes Lambda](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html). PRs executam validação Terraform sem backend ou credenciais AWS; plano remoto e apply continuam no workflow manual da main. A troca de modo só deve ocorrer após a importação e conferência dos cadastros reais e a validação do endpoint HTTPS.
